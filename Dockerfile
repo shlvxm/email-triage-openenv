@@ -23,22 +23,16 @@ RUN useradd -m -u 1000 appuser \
  && chown -R appuser:appuser /app
 USER appuser
 
-# ── Streamlit config ──────────────────────────────────────────────────────────
-ENV STREAMLIT_SERVER_PORT=7860
-ENV STREAMLIT_SERVER_ADDRESS=0.0.0.0
-ENV STREAMLIT_SERVER_HEADLESS=true
-ENV STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
-ENV STREAMLIT_THEME_BASE=dark
+# ── Environment Variables ─────────────────────────────────────────────────────
+# (Streamlit ones left for local execution, but Uvicorn uses port 7860)
+ENV STREAMLIT_SERVER_PORT=8501
+ENV PORT=7860
 
 EXPOSE 7860
 
 # ── Healthcheck ───────────────────────────────────────────────────────────────
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-    CMD curl -f http://localhost:7860/_stcore/health || exit 1
+    CMD curl -f http://localhost:7860/ || exit 1
 
-CMD ["streamlit", "run", "demo.py", \
-     "--server.port=7860", \
-     "--server.address=0.0.0.0", \
-     "--server.headless=true", \
-     "--server.fileWatcherType=none", \
-     "--browser.gatherUsageStats=false"]
+# Start the OpenEnv REST API server
+CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "7860"]

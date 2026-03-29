@@ -22,3 +22,7 @@ static/
 # OS-specific
 .DS_Store
 Thumbs.db
+
+# Deployment
+hf_upload.py
+.env

@@ -2,7 +2,7 @@
 title: Email Triage RL Agent (OpenEnv)
 emoji: 📬
 colorFrom: green
-colorTo: cyan
+colorTo: blue
 sdk: docker
 pinned: true
 license: mit

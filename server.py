@@ -14,11 +14,15 @@ current_env: Optional[EmailTriageEnv] = None
 class StepRequest(BaseModel):
     action: int
 
+class ResetRequest(BaseModel):
+    task_id: Optional[str] = "hard"
+
 @app.post("/reset", response_model=EmailObservation)
-def reset_env():
+def reset_env(request: Optional[ResetRequest] = None):
     """Initializes a new episode and returns the initial observation."""
     global current_env
-    current_env = EmailTriageEnv(task_level="hard") # Default to hard for benchmarking
+    task_level = request.task_id if request else "hard"
+    current_env = EmailTriageEnv(task_level=task_level)
     obs = current_env.reset()
     return obs
 

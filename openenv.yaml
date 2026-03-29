@@ -1,0 +1,26 @@
+name: email_triage
+version: 1.0.0
+description: "Reinforcement Learning environment for Indian inbox triage with 6 categories (Spam, Primary, Social, Promo, Urgent, Reply)."
+author: "Email Triage Team"
+tasks:
+  - id: easy
+    name: "Safe Triage"
+    difficulty: easy
+    episodes: 100
+  - id: medium
+    name: "Enterprise Inbox"
+    difficulty: medium
+    episodes: 100
+  - id: hard
+    name: "Agent Stress Test"
+    difficulty: hard
+    episodes: 100
+observation_space:
+  shape: [10]
+  dtype: float32
+  features: ["urgency", "keyword", "sender", "spam", "promo", "social", "reply", "attach", "tod", "thread"]
+action_space:
+  type: discrete
+  n: 6
+  labels: ["spam", "primary", "social", "promo", "urgent", "reply"]
+reward_range: [0.0, 1.0]

@@ -1,8 +1,15 @@
+import os
 import numpy as np
 import random
 from env import EmailTriageEnv
 from models import EmailAction
 from tasks import TASKS, Grader
+
+try:
+    from openai import OpenAI
+    client = OpenAI() if os.getenv("OPENAI_API_KEY") else None
+except ImportError:
+    client = None
 
 # ── Baseline Agents ─────────────────────────────────────────────────────────
 
@@ -39,6 +46,32 @@ def llm_agent_sim(obs) -> EmailAction:
     for k in scores: scores[k] += random.gauss(0, 0.04)
     return max(scores, key=scores.get)
 
+def llm_agent(obs) -> EmailAction:
+    """Uses real OpenAI API if key is present, otherwise falls back to sim."""
+    if client is None:
+        return llm_agent_sim(obs)
+        
+    system_prompt = "You classify emails into: SPAM (0), PRIMARY (1), SOCIAL (2), PROMO (3), URGENT (4), REPLY (5). Respond with only the integer."
+    user_prompt = f"Email summary: {obs.summary}\nClassify this email. Respond with digit (0-5)."
+    
+    try:
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.0,
+            max_tokens=5,
+        )
+        pred = response.choices[0].message.content.strip()
+        for char in pred:
+            if char.isdigit() and 0 <= int(char) <= 5:
+                return EmailAction(int(char))
+        return EmailAction.PRIMARY # Fallback
+    except Exception:
+        return llm_agent_sim(obs)
+
 # ── Evaluation Script ────────────────────────────────────────────────────────
 
 def main():
@@ -53,7 +86,7 @@ def main():
         
         score_rand = grader.score(random_agent)
         score_rule = grader.score(rule_based_agent)
-        score_llm  = grader.score(llm_agent_sim)
+        score_llm  = grader.score(llm_agent)
         
         print(f"{level:<15} | {score_rand:^10.2f} | {score_rule:^12.2f} | {score_llm:^10.2f}")
 

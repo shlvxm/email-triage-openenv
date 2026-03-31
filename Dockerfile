@@ -1,38 +1,33 @@
 FROM python:3.11-slim
 
-# ── System deps ───────────────────────────────────────────────────────────────
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    curl \
-    git \
-    && rm -rf /var/lib/apt/lists/*
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PORT=7860 \
+    TASK_LEVEL=medium \
+    MAX_STEPS=50
 
-# ── App dir ───────────────────────────────────────────────────────────────────
 WORKDIR /app
 
-# ── Python deps (cached layer) ────────────────────────────────────────────────
-COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip \
- && pip install --no-cache-dir -r requirements.txt
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# ── Copy source ───────────────────────────────────────────────────────────────
+COPY requirements.txt .
+
+RUN python -m pip install --upgrade pip \
+    && python -m pip install -r requirements.txt
+
 COPY . .
 
-# ── HF Spaces: non-root user required ────────────────────────────────────────
-RUN useradd -m -u 1000 appuser \
- && chown -R appuser:appuser /app
-USER appuser
+RUN useradd --create-home --uid 1000 appuser \
+    && chown -R appuser:appuser /app
 
-# ── Environment Variables ─────────────────────────────────────────────────────
-# (Streamlit ones left for local execution, but Uvicorn uses port 7860)
-ENV STREAMLIT_SERVER_PORT=8501
-ENV PORT=7860
+USER appuser
 
 EXPOSE 7860
 
-# ── Healthcheck ───────────────────────────────────────────────────────────────
-HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-    CMD curl -f http://localhost:7860/ || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+    CMD curl -fsS http://127.0.0.1:7860/health || exit 1
 
-# Start the OpenEnv REST API server
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "7860"]
+CMD ["python", "inference.py"]

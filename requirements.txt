@@ -1,23 +1,8 @@
-# ── Core RL environment & Server ─────────────────────────────────────────────
+fastapi==0.110.1
+uvicorn[standard]==0.29.0
+pydantic==2.6.4
 gymnasium==0.29.1
 numpy==1.26.4
-pydantic==2.6.4
-fastapi==0.110.0
-uvicorn==0.28.0
-
-# ── Streamlit UI ──────────────────────────────────────────────────────────────
-streamlit==1.32.0
-
-# ── Visualisation ─────────────────────────────────────────────────────────────
-matplotlib==3.8.3
-seaborn==0.13.2
-
-# ── LLM agent (optional, graceful fallback if API not configured) ─────────────
 openai==1.16.2
-
-# ── Image handling (HF template requirement) ──────────────────────────────────
-pillow==10.2.0
-
-# ── Utilities ─────────────────────────────────────────────────────────────────
 requests==2.31.0
-huggingface-hub==0.21.4
+pillow==10.2.0

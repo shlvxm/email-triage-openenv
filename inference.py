@@ -423,6 +423,7 @@ class StepResponse(BaseModel):
     reward: float
     terminated: bool
     truncated: bool
+    done: bool
     info: dict[str, Any]
 
 
@@ -652,6 +653,7 @@ async def step_endpoint(body: StepRequest) -> StepResponse:
             reward=float(reward),
             terminated=bool(terminated),
             truncated=bool(truncated),
+            done=bool(terminated or truncated),
             info=to_python(info),
         )
     except ValueError as exc:
@@ -689,6 +691,7 @@ async def step_agent_endpoint(
             reward=float(reward),
             terminated=bool(terminated),
             truncated=bool(truncated),
+            done=bool(terminated or truncated),
             info=to_python(info),
         )
     except ValueError as exc:

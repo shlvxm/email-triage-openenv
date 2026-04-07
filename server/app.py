@@ -2,14 +2,12 @@ from __future__ import annotations
 
 import os
 
-import uvicorn
-
-from inference import app
+from inference import app, run_server
 
 
 def main() -> None:
-    port = int(os.getenv("PORT", "7860"))
-    uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
+    os.environ.setdefault("PORT", os.getenv("PORT", "7860"))
+    raise SystemExit(run_server())
 
 
 if __name__ == "__main__":

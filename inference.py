@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import json
 import os
 import random
+import socket
 import threading
 from contextlib import asynccontextmanager
 from typing import Any, Literal
+from urllib.error import HTTPError, URLError
+from urllib.request import urlopen
 
 import gymnasium as gym
 import numpy as np
@@ -451,6 +455,57 @@ def get_env() -> EmailTriageEnv:
     return _env
 
 
+def _is_port_open(host: str, port: int, timeout: float = 0.5) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(timeout)
+        return sock.connect_ex((host, port)) == 0
+
+
+def _service_is_ready(host: str, port: int, timeout: float = 1.0) -> bool:
+    endpoints = (
+        ('/health', {'status': {'healthy', 'ok'}}),
+        ('/openapi.json', {'field': ('info', 'version')}),
+    )
+
+    for path, expectation in endpoints:
+        try:
+            with urlopen(f'http://{host}:{port}{path}', timeout=timeout) as response:
+                payload = json.loads(response.read().decode('utf-8'))
+        except (HTTPError, URLError, TimeoutError, ValueError, json.JSONDecodeError):
+            continue
+
+        if 'status' in expectation and payload.get('status') in expectation['status']:
+            return True
+        if 'field' in expectation:
+            current: Any = payload
+            for key in expectation['field']:
+                if not isinstance(current, dict) or key not in current:
+                    current = None
+                    break
+                current = current[key]
+            if current:
+                return True
+
+    return False
+
+
+def run_server() -> int:
+    try:
+        uvicorn.run(app, host='0.0.0.0', port=PORT, log_level='info')
+        return 0
+    except OSError:
+        if _is_port_open('127.0.0.1', PORT) and _service_is_ready('127.0.0.1', PORT):
+            print(f'Port {PORT} is already serving the app; exiting cleanly.')
+            return 0
+        raise
+    except SystemExit as exc:
+        code = exc.code if isinstance(exc.code, int) else 1
+        if code != 0 and _is_port_open('127.0.0.1', PORT) and _service_is_ready('127.0.0.1', PORT):
+            print(f'Port {PORT} is already serving the app; exiting cleanly.')
+            return 0
+        raise
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     global _env
@@ -701,4 +756,4 @@ async def step_agent_endpoint(
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=PORT, log_level="info")
+    raise SystemExit(run_server())

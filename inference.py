@@ -358,6 +358,48 @@ def rule_based_agent(obs: np.ndarray) -> int:
 
 
 def llm_agent_sim(obs: np.ndarray, rng: np.random.Generator) -> int:
+    import urllib.request
+
+    api_base = os.environ.get("API_BASE_URL", "").rstrip("/")
+    api_key = os.environ.get("API_KEY", "")
+
+    if api_base and api_key:
+        feature_values = dict(zip(FEATURE_NAMES, [float(x) for x in obs]))
+        lines = [
+            "You are an email triage agent. Given email feature scores (0.0-1.0), pick the best action.",
+            "",
+            "Features: " + json.dumps(feature_values),
+            "",
+            "Actions: 0=spam, 1=primary, 2=social, 3=promo, 4=urgent, 5=reply",
+            "",
+            "Reply with ONLY a single digit 0-5. No explanation.",
+        ]
+        prompt = chr(10).join(lines)
+        payload = json.dumps({
+            "model": "gpt-4o-mini",
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 5,
+            "temperature": 0.0,
+        }).encode()
+        req = urllib.request.Request(
+            api_base + "/chat/completions",
+            data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": "Bearer " + api_key,
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                result = json.loads(resp.read().decode())
+                text = result["choices"][0]["message"]["content"].strip()
+                action = int(text[0])
+                if 0 <= action <= 5:
+                    return action
+        except Exception:
+            pass
+
     urgency, keyword, sender, spam, promo, social, reply, attachment, time_of_day, thread_length = obs
     scores = np.array(
         [
@@ -736,12 +778,6 @@ def run_cli_inference():
 
 
 if __name__ == "__main__":
-    # Check if we should run in CLI mode or server mode
-    cli_mode = os.getenv("CLI_MODE", "false").lower() in ("true", "1", "yes")
-    
-    if cli_mode:
-        # CLI mode for OpenEnv validation
-        run_cli_inference()
-    else:
-        # Server mode for Hugging Face Space
-        run_server()
+    # Always run CLI inference - validator runs inference.py directly for [START]/[STEP]/[END] output.
+    # The validator manages the HTTP server separately; do NOT start uvicorn here.
+    run_cli_inference()

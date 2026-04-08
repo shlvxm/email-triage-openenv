@@ -221,7 +221,7 @@ if DEFAULT_TASK_LEVEL not in TASK_LEVELS:
 # Hackathon LLM proxy config (injected by validator)
 API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
-HF_TOKEN = os.getenv("HF_TOKEN")
+API_KEY = os.getenv("API_KEY")
 
 MAX_STEPS = max(1, _get_env_int("MAX_STEPS", 50))
 PORT = _get_env_int("PORT", 7860)
@@ -380,7 +380,7 @@ def llm_agent_sim(obs: np.ndarray, rng: np.random.Generator) -> int:
     try:
         client = OpenAI(
             base_url=API_BASE_URL,
-            api_key=HF_TOKEN if HF_TOKEN else "dummy-key",
+            api_key=API_KEY if API_KEY else "dummy-key",
         )
         response = client.chat.completions.create(
             model=MODEL_NAME,

@@ -17,6 +17,7 @@ from typing import Any, Literal
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
+from openai import OpenAI
 import gymnasium as gym
 import numpy as np
 import uvicorn
@@ -217,6 +218,11 @@ DEFAULT_TASK_LEVEL = os.getenv("TASK_LEVEL", "medium").strip().lower()
 if DEFAULT_TASK_LEVEL not in TASK_LEVELS:
     DEFAULT_TASK_LEVEL = "medium"
 
+# Hackathon LLM proxy config (injected by validator)
+API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
+MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
+HF_TOKEN = os.getenv("HF_TOKEN")
+
 MAX_STEPS = max(1, _get_env_int("MAX_STEPS", 50))
 PORT = _get_env_int("PORT", 7860)
 SPACE_NAME = os.getenv("SPACE_ID", "antigravity")
@@ -358,48 +364,38 @@ def rule_based_agent(obs: np.ndarray) -> int:
 
 
 def llm_agent_sim(obs: np.ndarray, rng: np.random.Generator) -> int:
-    import urllib.request
+    """Call the hackathon LLM proxy using OpenAI client to decide the email action."""
+    feature_values = dict(zip(FEATURE_NAMES, [float(x) for x in obs]))
+    prompt_lines = [
+        "You are an email triage agent. Given email feature scores (0.0-1.0), pick the best action.",
+        "",
+        "Features: " + json.dumps(feature_values),
+        "",
+        "Actions: 0=spam, 1=primary, 2=social, 3=promo, 4=urgent, 5=reply",
+        "",
+        "Reply with ONLY a single digit 0-5. No explanation.",
+    ]
+    prompt = "\n".join(prompt_lines)
 
-    api_base = os.environ.get("API_BASE_URL", "").rstrip("/")
-    api_key = os.environ.get("API_KEY", "")
-
-    if api_base and api_key:
-        feature_values = dict(zip(FEATURE_NAMES, [float(x) for x in obs]))
-        lines = [
-            "You are an email triage agent. Given email feature scores (0.0-1.0), pick the best action.",
-            "",
-            "Features: " + json.dumps(feature_values),
-            "",
-            "Actions: 0=spam, 1=primary, 2=social, 3=promo, 4=urgent, 5=reply",
-            "",
-            "Reply with ONLY a single digit 0-5. No explanation.",
-        ]
-        prompt = chr(10).join(lines)
-        payload = json.dumps({
-            "model": "gpt-4o-mini",
-            "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 5,
-            "temperature": 0.0,
-        }).encode()
-        req = urllib.request.Request(
-            api_base + "/chat/completions",
-            data=payload,
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": "Bearer " + api_key,
-            },
-            method="POST",
+    try:
+        client = OpenAI(
+            base_url=API_BASE_URL,
+            api_key=HF_TOKEN if HF_TOKEN else "dummy-key",
         )
-        try:
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                result = json.loads(resp.read().decode())
-                text = result["choices"][0]["message"]["content"].strip()
-                action = int(text[0])
-                if 0 <= action <= 5:
-                    return action
-        except Exception:
-            pass
+        response = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=5,
+            temperature=0.0,
+        )
+        text = response.choices[0].message.content.strip()
+        action = int(text[0])
+        if 0 <= action <= 5:
+            return action
+    except Exception:
+        pass
 
+    # Fallback: rule-based heuristic
     urgency, keyword, sender, spam, promo, social, reply, attachment, time_of_day, thread_length = obs
     scores = np.array(
         [
